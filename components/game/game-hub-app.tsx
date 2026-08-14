@@ -540,11 +540,21 @@ function GameIframe({
   const [frameId] = useState(() => `game_frame_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`);
   const srcDoc = useMemo(() => createGameFrameSrcDoc(html, frameId), [frameId, html]);
   const syncHostedSafeArea = useCallback(() => {
-    iframeRef.current?.contentWindow?.postMessage({
+    const frame = iframeRef.current;
+    if (!frame) return;
+    // 实测悬浮返回钮下沿相对 iframe 的位置，作为顶部安全区；找不到时退回估算值
+    let measuredTop: number | null = null;
+    const backBtn = document.querySelector(".game-runtime-floating-back");
+    if (backBtn) {
+      const backRect = backBtn.getBoundingClientRect();
+      const frameRect = frame.getBoundingClientRect();
+      if (backRect.height > 0) measuredTop = backRect.bottom - frameRect.top + 8;
+    }
+    frame.contentWindow?.postMessage({
       source: "ai-phone-game-host",
       type: "layout.safe-area",
       id: frameId,
-      safeArea: getPwaHostedSafeArea("game"),
+      safeArea: getPwaHostedSafeArea("game", false, measuredTop),
     }, "*");
   }, [frameId]);
 

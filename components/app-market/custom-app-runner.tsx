@@ -746,11 +746,22 @@ export function CustomAppRunner({
   const effectiveEmbedded = embedded || isBackgroundRunner;
   const srcDoc = useMemo(() => createCustomAppSrcDoc(app, frameId, launchContext, effectiveEmbedded), [app, frameId, launchContext, effectiveEmbedded]);
   const syncHostedSafeArea = useCallback(() => {
-    iframeRef.current?.contentWindow?.postMessage({
+    const frame = iframeRef.current;
+    if (!frame) return;
+    // 实测胶囊按钮（菜单/关闭）下沿相对 iframe 的位置，作为顶部安全区；
+    // 元素不在（如嵌入模式）时退回 getPwaHostedSafeArea 的估算值。
+    let measuredTop: number | null = null;
+    const capsule = frame.parentElement?.querySelector(".custom-app-runner-capsule");
+    if (capsule) {
+      const capsuleRect = capsule.getBoundingClientRect();
+      const frameRect = frame.getBoundingClientRect();
+      if (capsuleRect.height > 0) measuredTop = capsuleRect.bottom - frameRect.top + 8;
+    }
+    frame.contentWindow?.postMessage({
       source: "ai-phone-custom-app-host",
       type: "layout.safe-area",
       frameId,
-      safeArea: getPwaHostedSafeArea("custom-app", effectiveEmbedded),
+      safeArea: getPwaHostedSafeArea("custom-app", effectiveEmbedded, measuredTop),
     }, "*");
   }, [effectiveEmbedded, frameId]);
   const declaredEvents = useMemo(() => getCustomAppDeclaredEventNames(app), [app]);

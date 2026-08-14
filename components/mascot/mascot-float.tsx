@@ -39,8 +39,6 @@ import {
   type NineSliceCalibrationEventDetail,
   type NineSliceValues,
 } from "@/lib/css-asset-tools";
-import { CHAT_APP_SETTINGS_UPDATED_EVENT, loadChatAppSettings } from "@/lib/chat-storage";
-import { shouldSendChatInputOnEnter } from "@/lib/chat-input-keyboard";
 
 
 /**
@@ -605,7 +603,6 @@ export function MascotFloat() {
 
   // Chat state
   const [chatInput, setChatInput] = useState("");
-  const [enterToSendEnabled, setEnterToSendEnabled] = useState(() => loadChatAppSettings().enterToSendEnabled === true);
   const mascotChat = useSyncExternalStore(subscribeMascotChat, getMascotChatSnapshot, getMascotChatSnapshot);
   const mascotSettings = useSyncExternalStore(subscribeMascotSettings, getMascotSettingsSnapshot, getMascotSettingsSnapshot);
   const mascotDisplayName = mascotSettings.nickname || "AI助手";
@@ -630,14 +627,6 @@ export function MascotFloat() {
 
   useEffect(() => {
     void hydrateMascotChat();
-  }, []);
-
-  useEffect(() => {
-    const syncEnterToSend = () => {
-      setEnterToSendEnabled(loadChatAppSettings().enterToSendEnabled === true);
-    };
-    window.addEventListener(CHAT_APP_SETTINGS_UPDATED_EVENT, syncEnterToSend);
-    return () => window.removeEventListener(CHAT_APP_SETTINGS_UPDATED_EVENT, syncEnterToSend);
   }, []);
 
   useEffect(() => {
@@ -2306,11 +2295,12 @@ export function MascotFloat() {
                         value={chatInput}
                         onChange={(e) => setChatInput(e.target.value)}
                         onKeyDown={(event) => {
-                          if (!shouldSendChatInputOnEnter(event, enterToSendEnabled)) return;
+                          // 悬浮面板是单行输入框（装不下换行），回车始终发送；只挡输入法候选确认
+                          if (event.key !== "Enter" || event.nativeEvent.isComposing) return;
                           event.preventDefault();
                           void handleSend();
                         }}
-                        enterKeyHint={enterToSendEnabled ? "send" : "enter"}
+                        enterKeyHint="send"
                         disabled={isThinking}
                       />
                       {isThinking
@@ -2413,11 +2403,11 @@ export function MascotFloat() {
                           value={chatInput}
                           onChange={(e) => setChatInput(e.target.value)}
                           onKeyDown={(event) => {
-                            if (!shouldSendChatInputOnEnter(event, enterToSendEnabled)) return;
+                            if (event.key !== "Enter" || event.nativeEvent.isComposing) return;
                             event.preventDefault();
                             void handleSend();
                           }}
-                          enterKeyHint={enterToSendEnabled ? "send" : "enter"}
+                          enterKeyHint="send"
                           disabled={isThinking}
                         />
                         {isThinking

@@ -59,15 +59,26 @@ export function getRuntimePwaDisplayMode(): RuntimePwaDisplayMode {
   return navigatorWithStandalone.standalone ? "standalone" : "browser";
 }
 
-/** Safe-area values injected into sandboxed apps, which cannot inherit host CSS variables. */
-export function getPwaHostedSafeArea(surface: PwaHostedSurface, embedded = false): PwaHostedSafeArea {
+/** 非沉浸布局是否生效：必须用户显式开了「显示系统状态栏」且运行时确实不在全屏。
+ *  只看运行时模式是不行的——iOS 装到桌面永远报 standalone，会把没碰过开关的
+ *  用户也误判成非沉浸（这正是 pwa-manifest-injector 挂标记前要先过这道门的原因）。 */
+export function isNonImmersiveLayoutActive(): boolean {
+  if (typeof document === "undefined") return false;
+  return readPwaDisplayPreference(document.cookie) === "standalone"
+    && getRuntimePwaDisplayMode() !== "fullscreen";
+}
+
+/** Safe-area values injected into sandboxed apps, which cannot inherit host CSS variables.
+ *  measuredTopPx：宿主实测的顶部浮层（胶囊按钮/悬浮返回钮）下沿，优先于估算值——
+ *  壳布局以后再调整时数字不会失真。 */
+export function getPwaHostedSafeArea(surface: PwaHostedSurface, embedded = false, measuredTopPx?: number | null): PwaHostedSafeArea {
   if (embedded) {
     return { top: "0px", right: "0px", bottom: "0px", left: "0px" };
   }
 
-  const nonImmersive = getRuntimePwaDisplayMode() !== "fullscreen";
+  const fallbackTop = isNonImmersiveLayoutActive() ? (surface === "game" ? "60px" : "48px") : "88px";
   return {
-    top: nonImmersive ? (surface === "game" ? "60px" : "48px") : "88px",
+    top: measuredTopPx != null && measuredTopPx > 0 ? `${Math.round(measuredTopPx)}px` : fallbackTop,
     right: "16px",
     bottom: "24px",
     left: "16px",
