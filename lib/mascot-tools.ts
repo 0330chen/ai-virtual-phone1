@@ -541,7 +541,10 @@ const REGEX_RULE_OBJ = {
         disabled: { type: "boolean" },
         markdownOnly: { type: "boolean", description: "仅显示层应用，不影响存储" },
         promptOnly: { type: "boolean", description: "仅 prompt 应用，不影响显示" },
+        historyOnly: { type: "boolean", description: "仅历史消息（true=这条规则只作用于聊天历史消息，不碰系统提示词/预设/世界书）。与「用户输入」位置 + promptOnly 组合时，可精确剥离历史消息里的自定义标签（如 <thinking>/<pixel-console>），且不会误删系统提示词里的格式约束示例" },
         substituteRegex: { type: "string", enum: ["0", "1", "2"], description: "0=不替换 1=原始替换 2=转义后替换宏（如{{user}}）" },
+        minDepth: { type: "number", description: "最小消息深度（可选）。最近一条消息 depth=0，越旧数字越大；-1=不限制最小深度，即只看最新一条往前的范围下界。不传=不限" },
+        maxDepth: { type: "number", description: "最大消息深度（可选）。0=只处理最新一条消息；不传=不限（含 ∞ 语义）。只处理最近几条时配合 minDepth 使用" },
     },
     required: ["scriptName", "findRegex", "replaceString"],
 };
@@ -1028,8 +1031,6 @@ export function buildMascotNativeNameMap(): Map<string, string> {
 export type MascotToolContext = {
     pageContext: MascotPageContext;
     history?: CssAssetUserImageHistoryMessage[];
-    /** 同一条用户消息触发的整轮任务共享，用于保证每个角色只备份一次。 */
-    characterBackupIds?: Set<string>;
 };
 
 /** 执行小卷工具调用 */
@@ -1056,7 +1057,7 @@ export async function executeMascotToolCall(call: ToolCall, ctx: MascotToolConte
             // ─── 角色 ───
             case "读取角色": return await handleReadCharacter(call.args);
             case "创建角色": return await handleCreateCharacter(call.args);
-            case "更新角色字段": return await handleUpdateCharacterField(call.args, ctx);
+            case "更新角色字段": return await handleUpdateCharacterField(call.args);
 
             // ─── 角色世界（世界卷宗）───
             case "列出世界卷宗": return await handleListCharacterWorlds();
@@ -1531,9 +1532,8 @@ async function handleCreateCharacter(args: Record<string, unknown>): Promise<Too
     return { name: "创建角色", success: true, data: `已创建角色 ${newChar.name} (${newChar.id})${briefPersona ? "，含简量人设" : ""}` };
 }
 
-async function handleUpdateCharacterField(args: Record<string, unknown>, ctx: MascotToolContext): Promise<ToolResult> {
+async function handleUpdateCharacterField(args: Record<string, unknown>): Promise<ToolResult> {
     const { loadCharacters, saveCharacters } = await import("./character-storage");
-    const { backupCharacterVersion, getCharacterCurrentVersion } = await import("./character-version-storage");
     const chars = loadCharacters();
     const idx = chars.findIndex((c) => c.name === args.name);
     if (idx < 0) return { name: "更新角色字段", success: false, error: `找不到角色：${args.name}` };
@@ -1549,22 +1549,10 @@ async function handleUpdateCharacterField(args: Record<string, unknown>, ctx: Ma
     } else {
         return { name: "更新角色字段", success: false, error: `不支持的字段：${field}` };
     }
-    // 一条用户消息触发的整轮小卷任务中，同一角色只在第一次写入前备份。
-    const backupIds = ctx.characterBackupIds ?? (ctx.characterBackupIds = new Set<string>());
-    const didBackup = !backupIds.has(chars[idx].id);
-    const nextVersion = didBackup
-        ? backupCharacterVersion(chars[idx], "mascot", "小卷本次任务修改前自动备份")
-        : getCharacterCurrentVersion(chars[idx].id);
-    backupIds.add(chars[idx].id);
-
     char.updatedAt = now;
     chars[idx] = char as typeof chars[number];
     saveCharacters(chars);
-    return {
-        name: "更新角色字段",
-        success: true,
-        data: `${didBackup ? "已为本次任务自动备份旧卡，并" : "本次任务已备份，继续"}更新 ${args.name} 的 ${field}；当前版本 V${nextVersion}`,
-    };
+    return { name: "更新角色字段", success: true, data: `已更新 ${args.name} 的 ${field}` };
 }
 
 // ── Worldbook Handlers ──────────────────────────
@@ -2109,6 +2097,8 @@ async function handleReadRegexGroup(args: Record<string, unknown>): Promise<Tool
         lines.push(`    replace: ${r.replaceString}`);
         lines.push(`    tags: ${JSON.stringify(r.tags || ["chat", "text"])}`);
         lines.push(`    placement: ${JSON.stringify(r.placement)}`);
+        lines.push(`    markdownOnly: ${r.markdownOnly ? "true" : "false"} / promptOnly: ${r.promptOnly ? "true" : "false"} / historyOnly: ${r.historyOnly ? "true" : "false"} / substituteRegex: ${r.substituteRegex ?? 0}`);
+        lines.push(`    minDepth: ${r.minDepth != null ? r.minDepth : "不限"} / maxDepth: ${r.maxDepth != null ? r.maxDepth : "不限"}`);
     });
     return { name: "读取正则组", success: true, data: lines.join("\n") };
 }
@@ -2138,12 +2128,23 @@ function normalizeRule(r: Record<string, unknown>): Record<string, unknown> {
         placement: r.placement || [2],
         markdownOnly: r.markdownOnly ?? false,
         promptOnly: r.promptOnly ?? false,
+        historyOnly: r.historyOnly ?? false,
         substituteRegex: numberOption(r.substituteRegex, 0),
         runOnEdit: r.runOnEdit ?? false,
         trimStrings: r.trimStrings || [],
-        minDepth: r.minDepth,
-        maxDepth: r.maxDepth,
+        minDepth: normalizeRegexDepth(r.minDepth),
+        maxDepth: normalizeRegexDepth(r.maxDepth),
     };
+}
+
+/** 把深度字段规范化为合法值：合法数字保留，否则视为不限（undefined）。 */
+function normalizeRegexDepth(value: unknown): number | undefined {
+    if (typeof value === "number" && Number.isFinite(value)) return value;
+    if (typeof value === "string" && value.trim() !== "") {
+        const parsed = Number(value);
+        if (Number.isFinite(parsed)) return parsed;
+    }
+    return undefined;
 }
 
 async function handleCreateRegexGroup(args: Record<string, unknown>): Promise<ToolResult> {
@@ -2183,6 +2184,8 @@ async function handleUpdateRegexRule(args: Record<string, unknown>): Promise<Too
     const updates = { ...(args.updates as Record<string, unknown>) };
     if ("substituteRegex" in updates) updates.substituteRegex = numberOption(updates.substituteRegex, 0);
     if ("tags" in updates) updates.tags = normalizeMascotRegexRuleTags(updates.tags);
+    if ("minDepth" in updates) updates.minDepth = normalizeRegexDepth(updates.minDepth);
+    if ("maxDepth" in updates) updates.maxDepth = normalizeRegexDepth(updates.maxDepth);
     group.rules[ruleIdx] = { ...group.rules[ruleIdx], ...updates } as typeof group.rules[number];
     group.updatedAt = Date.now();
     groups[idx] = group;
