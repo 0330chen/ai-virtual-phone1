@@ -12,12 +12,12 @@ import CSSSchemeBar from "@/components/ui/css-scheme-picker";
 import { SessionCustomCSS } from "@/components/ui/session-custom-css";
 import { CHAT_SESSION_CSS_EXAMPLE } from "@/lib/css-examples";
 import {
-    appendMascotMessage,
     clearMascotToolHistoryMessages,
     createMascotSession,
     deleteMascotMessageWithLinkedTools,
     deleteMascotSession,
     generateMascotReply,
+    sendMascotMessage,
     getMascotChatSnapshot,
     hasMascotToolHistoryMessages,
     hydrateMascotChat,
@@ -692,7 +692,7 @@ export function MascotChatRoom({ onBack, onDeleted }: MascotChatRoomProps) {
         const images = pendingImages;
         setPendingImages([]);
         setShowEmojiPanel(false);
-        await appendMascotMessage({ text, images });
+        await sendMascotMessage({ text, images, context });
     };
 
     const handleGenerateReply = async () => {
@@ -1199,8 +1199,8 @@ export function MascotChatRoom({ onBack, onDeleted }: MascotChatRoomProps) {
                         onClick={() => void handleGenerateReply()}
                         disabled={!canGenerateReply}
                         className="ui-bare-btn text-[var(--c-text)]"
-                        aria-label="生成回复"
-                        title="生成回复"
+                        aria-label="重新生成回复"
+                        title="生成回复（发送后未生成或删除回复后使用）"
                     >
                         <Sparkles size={24} strokeWidth={1.5} />
                     </button>
