@@ -82,6 +82,7 @@ export function RegexManager({ isActive = true }: { isActive?: boolean } = {}) {
     const [testingRuleId, setTestingRuleId] = useState<string | null>(null);
     const [testInput, setTestInput] = useState("在这里输入测试文本...");
     const [expandTarget, setExpandTarget] = useState<{ ruleId: string; field: "findRegex" | "replaceString" } | null>(null);
+    const [previewHtml, setPreviewHtml] = useState<string | null>(null);
     const [groupTestOpen, setGroupTestOpen] = useState(false);
     const [groupTestInput, setGroupTestInput] = useState("");
     const [groupTestExpandStep, setGroupTestExpandStep] = useState<number | null>(null);
@@ -323,7 +324,6 @@ export function RegexManager({ isActive = true }: { isActive?: boolean } = {}) {
         if (typeof obj.markdownOnly === "boolean") rule.markdownOnly = obj.markdownOnly;
         if (typeof obj.promptOnly === "boolean") rule.promptOnly = obj.promptOnly;
         if (typeof obj.runOnEdit === "boolean") rule.runOnEdit = obj.runOnEdit;
-        if (typeof obj.historyOnly === "boolean") rule.historyOnly = obj.historyOnly;
         if (typeof obj.substituteRegex === "number") rule.substituteRegex = obj.substituteRegex;
         if (typeof obj.minDepth === "number") rule.minDepth = obj.minDepth;
         if (typeof obj.maxDepth === "number") rule.maxDepth = obj.maxDepth;
@@ -569,10 +569,8 @@ export function RegexManager({ isActive = true }: { isActive?: boolean } = {}) {
                                                                     {step.skipped && <span className="ts-11" style={{ color: "var(--c-icon)", opacity: 0.6 }}>{step.skipped}</span>}
                                                                 </button>
                                                                 {groupTestExpandStep === i && !step.skipped && (
-                                                                    <div className="flex flex-col gap-1" style={{ margin: "4px 0 8px" }}>
-                                                                        <div className="ui-code-block" style={{ maxHeight: 200, overflow: "auto", whiteSpace: "pre-wrap", fontSize: "calc(12px*var(--app-text-scale,1))" }}>
-                                                                            {step.output || <span className="menu-desc !mt-0">(空)</span>}
-                                                                        </div>
+                                                                    <div className="ui-code-block" style={{ maxHeight: 200, overflow: "auto", whiteSpace: "pre-wrap", fontSize: "calc(12px*var(--app-text-scale,1))", margin: "4px 0 8px" }}>
+                                                                        {step.output || <span className="menu-desc !mt-0">(空)</span>}
                                                                     </div>
                                                                 )}
                                                             </div>
@@ -580,13 +578,19 @@ export function RegexManager({ isActive = true }: { isActive?: boolean } = {}) {
                                                     </div>
                                                 </div>
                                                 <div className="flex flex-col gap-1">
-                                                    <div className="flex items-center justify-between gap-2 flex-wrap">
-                                                        <label className="menu-desc !mt-0">最终输出</label>
-                                                    </div>
+                                                    <label className="menu-desc">最终输出</label>
                                                     <div className="ui-code-block" style={{ maxHeight: 300, overflow: "auto", whiteSpace: "pre-wrap", fontSize: "calc(13px*var(--app-text-scale,1))" }}>
                                                         {groupOutput || <span className="menu-desc !mt-0">(空)</span>}
                                                     </div>
                                                 </div>
+                                                {/<[a-z][\s\S]*?>/i.test(groupOutput) && (
+                                                    <button
+                                                        className="ui-btn ui-btn-outline self-end ts-13"
+                                                        onClick={() => setPreviewHtml(groupOutput)}
+                                                    >
+                                                        <Maximize2 size={14} /> 渲染预览
+                                                    </button>
+                                                )}
                                             </>
                                         )}
                                     </div>
@@ -798,14 +802,6 @@ export function RegexManager({ isActive = true }: { isActive?: boolean } = {}) {
                                                                     编辑时执行
                                                                 </label>
                                                             </div>
-                                                            <div className="flex items-center justify-between gap-6 mt-2">
-                                                                <label className="ui-checkbox-label whitespace-nowrap">
-                                                                    <input type="checkbox" checked={rule.historyOnly ?? false}
-                                                                        onChange={(e) => updateRule(rule.id, { historyOnly: e.target.checked || undefined })} />
-                                                                    仅历史消息
-                                                                </label>
-                                                                <span className="menu-desc !mt-0">勾选后只作用于聊天历史消息，不碰系统提示词/预设/世界书</span>
-                                                            </div>
                                                         </div>
 
                                                         <div className="flex flex-col gap-1">
@@ -906,10 +902,17 @@ export function RegexManager({ isActive = true }: { isActive?: boolean } = {}) {
                                                                                 <span className="ui-tag" data-variant={matchCount > 0 ? "success" : "muted"}>
                                                                                     {matchCount > 0 ? `${matchCount} 处匹配` : "无匹配"}
                                                                                 </span>
-                                                                                <span className="flex-1" />
                                                                             </div>
                                                                             <div className="ui-code-block">{output || <span className="menu-desc !mt-0">(空)</span>}</div>
                                                                         </div>
+                                                                    )}
+                                                                    {!error && matchCount > 0 && /<[a-z][\s\S]*?>/i.test(output) && (
+                                                                        <button
+                                                                            className="ui-btn ui-btn-outline self-end ts-13"
+                                                                            onClick={() => setPreviewHtml(output)}
+                                                                        >
+                                                                            <Maximize2 size={14} /> 渲染预览
+                                                                        </button>
                                                                     )}
                                                                 </div>
                                                             );
@@ -1013,6 +1016,20 @@ export function RegexManager({ isActive = true }: { isActive?: boolean } = {}) {
                     />
                 );
             })()}
+
+            {previewHtml && (
+                <div className="absolute inset-0 z-[999] flex flex-col" style={{ background: "var(--c-page-body-bg)" }}>
+                    <header className="flex items-center justify-between px-4 shrink-0" style={{ height: 48, marginTop: 48 }}>
+                        <span className="menu-label font-semibold ts-15">渲染预览</span>
+                        <button onClick={() => setPreviewHtml(null)} className="w-[32px] h-[32px] rounded-full flex items-center justify-center" style={{ background: "var(--c-card)", color: "var(--c-text)" }}>
+                            <X size={18} />
+                        </button>
+                    </header>
+                    <div className="flex-1 overflow-auto p-4">
+                        <div className="chat-markdown" dangerouslySetInnerHTML={{ __html: previewHtml }} />
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
