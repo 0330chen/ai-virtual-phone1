@@ -88,6 +88,10 @@ export interface AssemblerInput {
     groupTools?: string;                     // formatted tool definitions for {{groupTools}} macro (group chat)
     customAppRichMediaDirectives?: string;   // formatted custom app rich-media directives
     chatBilingualInstruction?: string;       // session-specific bilingual output rule for {{chatBilingualInstruction}}
+    statusRegionSection?: string;            // {{statusRegionSection}} — 状态区章节（native 原文 / 空 / 自定义契约）
+    statusRegionExampleLine?: string;        // {{statusRegionExampleLine}} — 主动消息输出示例中的状态区行
+    statusRegionComposition?: string;        // {{statusRegionComposition}} — 文字聊天模式【输出构成】行
+    statusRegionFullExample?: string;        // {{statusRegionFullExample}} — 完整示例中的状态值+内心行
     offlineBilingualInstruction?: string;    // offline-mode bilingual output rule for {{offlineBilingualInstruction}}
     offlineSummaryTag?: string;              // XML tag used for offline-mode summary output
     checkPhoneBilingualInstruction?: string; // checkphone bilingual output rule for {{checkPhoneBilingualInstruction}}
@@ -675,6 +679,10 @@ export function assemblePromptPayload(input: AssemblerInput): LLMMessage[] {
         engine.groupTools = input.groupTools ?? "";
         engine.customAppRichMediaDirectives = input.customAppRichMediaDirectives ?? "";
         engine.chatBilingualInstruction = input.chatBilingualInstruction ?? "";
+        engine.statusRegionSection = input.statusRegionSection ?? "";
+        engine.statusRegionExampleLine = input.statusRegionExampleLine ?? "";
+        engine.statusRegionComposition = input.statusRegionComposition ?? "";
+        engine.statusRegionFullExample = input.statusRegionFullExample ?? "";
         engine.offlineBilingualInstruction = input.offlineBilingualInstruction ?? "";
         engine.offlineSummaryTag = input.offlineSummaryTag ?? "summary";
         engine.checkPhoneBilingualInstruction = input.checkPhoneBilingualInstruction ?? "";
@@ -1330,8 +1338,8 @@ export type RegexContext = {
     isEdit?: boolean;        // true when user is editing a message
     depth?: number;          // message depth (0 = latest)
     activeTags?: string[];   // current app tags used for tag-scoped rule filtering
-    macroEngine?: MacroEngine;  // for {{char}} etc. in findRegex & replaceString
     history?: boolean;       // true when the block is a chat history message (historyOnly rules only fire here)
+    macroEngine?: MacroEngine;  // for {{char}} etc. in findRegex & replaceString
 };
 
 /**
@@ -1586,6 +1594,10 @@ export interface GroupAssemblerInput {
     groupRoster?: string;
     customAppRichMediaDirectives?: string;
     chatBilingualInstruction?: string;
+    statusRegionSection?: string;
+    statusRegionExampleLine?: string;
+    statusRegionComposition?: string;
+    statusRegionFullExample?: string;
     offlineBilingualInstruction?: string;
     offlineSummaryTag?: string;
     checkPhoneBilingualInstruction?: string;
@@ -1837,6 +1849,10 @@ export function assembleGroupPromptPayload(input: GroupAssemblerInput): LLMMessa
         engine.groupTools = input.groupTools ?? "";
         engine.groupRoster = input.groupRoster ?? "";
         engine.chatBilingualInstruction = input.chatBilingualInstruction ?? "";
+        engine.statusRegionSection = input.statusRegionSection ?? "";
+        engine.statusRegionExampleLine = input.statusRegionExampleLine ?? "";
+        engine.statusRegionComposition = input.statusRegionComposition ?? "";
+        engine.statusRegionFullExample = input.statusRegionFullExample ?? "";
         engine.offlineBilingualInstruction = input.offlineBilingualInstruction ?? "";
         engine.offlineSummaryTag = input.offlineSummaryTag ?? "summary";
         engine.checkPhoneBilingualInstruction = input.checkPhoneBilingualInstruction ?? "";
