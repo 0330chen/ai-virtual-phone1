@@ -184,7 +184,8 @@ export default function MapView({ world, save, onSaveUpdate, onBack }: Props) {
     // Companion avatars
     for (const a of save.agents) {
       const ch = characters.find(c => c.id === a.characterId);
-      if (ch?.avatar) map[ch.name] = ch.avatar;
+      const avatar = ch?.chatAvatar || ch?.avatar;
+      if (avatar && ch) map[ch.name] = avatar;
     }
     return map;
   }, [userIdentity, save.agents, characters]);
@@ -1825,6 +1826,7 @@ export default function MapView({ world, save, onSaveUpdate, onBack }: Props) {
                     .map(a => {
                       const ch = characters.find(c => c.id === a.characterId);
                       if (!ch) return null;
+                      const chatAvatar = ch.chatAvatar || ch.avatar;
                       return (
                         <button key={a.characterId}
                           onClick={() => handleFreeModeChat(a.characterId)}
@@ -1838,8 +1840,8 @@ export default function MapView({ world, save, onSaveUpdate, onBack }: Props) {
                           }}>
                           <div style={{
                             width: 32, height: 32, borderRadius: "50%",
-                            backgroundImage: ch.avatar ? `url(${ch.avatar})` : "none",
-                            backgroundColor: ch.avatar ? "transparent" : "var(--c-adv-choice-bg)",
+                            backgroundImage: chatAvatar ? `url(${chatAvatar})` : "none",
+                            backgroundColor: chatAvatar ? "transparent" : "var(--c-adv-choice-bg)",
                             backgroundSize: "cover", backgroundPosition: "center", backgroundRepeat: "no-repeat",
                             border: "1.5px solid var(--c-adv-accent-dim)",
                           }} />
@@ -2353,7 +2355,14 @@ export default function MapView({ world, save, onSaveUpdate, onBack }: Props) {
                   selectedNodeId={selectedNodeId}
                   discoveredNodes={save.discoveredNodes}
                   visitedNodes={save.visitedNodes}
-                  agentPositions={save.agents.map(a => ({ nodeId: a.currentNodeId, name: charName(a.characterId), avatar: characters.find(c => c.id === a.characterId)?.avatar || undefined }))}
+                  agentPositions={save.agents.map(a => ({
+                    nodeId: a.currentNodeId,
+                    name: charName(a.characterId),
+                    avatar:
+                      characters.find(c => c.id === a.characterId)?.chatAvatar ||
+                      characters.find(c => c.id === a.characterId)?.avatar ||
+                      undefined
+                  }))}
                   playerAvatar={userIdentity?.avatarUrl}
                   playerName={userIdentity?.name || "我"}
                   onNodeClick={(id) => {
