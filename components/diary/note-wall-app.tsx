@@ -379,11 +379,7 @@ export function NoteWallApp({ onBack, onNotice }: NoteWallAppProps) {
       if (refreshTimerRef.current) window.clearTimeout(refreshTimerRef.current);
       refreshTimerRef.current = window.setTimeout(refresh, 250);
     });
-    // 轮询只是 Realtime 推送的兜底：60 秒一次足够，页面不在前台时不拉
-    //（整面墙全量下发，这里是 Supabase 出站流量的常客）
-    const poll = window.setInterval(() => {
-      if (!document.hidden) refresh();
-    }, 60000);
+    const poll = window.setInterval(refresh, 30000);
     return () => {
       unsubscribe();
       window.clearInterval(poll);
@@ -1740,7 +1736,7 @@ function TimerSettingsPanel({ characters, settings, generatingCharacterIds, repl
                     }}
                   >
                     <span className="nw-character-avatar">
-                      {character.avatar ? <img src={character.avatar} alt="" /> : <Bot size={18} />}
+                      {character.chatAvatar || character.avatar ? <img src={character.chatAvatar || character.avatar} alt="" /> : <Bot size={18} />}
                     </span>
                     <span>
                       <strong>{character.name}</strong>
