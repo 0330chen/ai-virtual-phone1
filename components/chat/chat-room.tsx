@@ -45,7 +45,6 @@ import { generateGroupChatCompletion, generateGroupOfflineChatCompletion, parseG
 import { appendChatOfflineTurn, deleteChatOfflineTurn, deleteChatOfflineTurnsFrom, loadChatOfflineTurns, parseOfflineResponse, saveChatOfflineTurns, updateChatOfflineTurn, type ChatOfflineTurn } from "@/lib/chat-offline-storage";
 import { applyDisplayRegex, applyEditRegex } from "@/lib/llm-prompt-assembler";
 import { scheduleFollowUp, cancelFollowUp } from "@/lib/follow-up-service";
-import { useKeyboardDismissAutoSend } from "@/components/chat/use-keyboard-dismiss-auto-send";
 import { PENDING_REPLY_PREFIX } from "@/lib/friend-request-engine";
 import type { UserIdentity } from "@/components/settings/user-identity";
 import { AlertCircle, Blocks, Check, Trash2, User, ChevronLeft, ChevronRight, Clapperboard, Clock, Gift, Languages, Loader2, MoreHorizontal, X } from "lucide-react";
@@ -2847,7 +2846,7 @@ export function ChatRoom({ session, onBack }: ChatRoomProps) {
             dispatchChatMessageNotice({
                 sessionId: session.id,
                 senderName: charN,
-                avatar: character?.avatar || null,
+                avatar: character?.chatAvatar || character?.avatar || null,
                 body: body.slice(0, 80),
             });
         };
@@ -2859,7 +2858,7 @@ export function ChatRoom({ session, onBack }: ChatRoomProps) {
             dispatchVisibleNotice(msg);
             const body = getNoticeBody(msg);
             if (body) {
-                sendBrowserNotification(charN, { body: body.slice(0, 60), icon: character?.avatar || undefined });
+                sendBrowserNotification(charN, { body: body.slice(0, 60), icon: character?.chatAvatar || character?.avatar || undefined });
             }
             const afterPublishResult = entry.afterPublish?.(msg);
             if (afterPublishResult) imageReplacementTasks.push(Promise.resolve(afterPublishResult));
@@ -3662,17 +3661,6 @@ export function ChatRoom({ session, onBack }: ChatRoomProps) {
         }
         if (shouldRunDeclineReply) await triggerReply();
     };
-
-    // 收起键盘（或关掉表情/加号面板）并安静 N 秒后自动触发回复，
-    // 等价于替用户点一次「触发回复」。判定全在 hook 内部，配置关掉后与手动模式一致。
-    useKeyboardDismissAutoSend(wrapperRef, {
-        active: !offlineMode && !isMultiSelectMode,
-        pending: pendingGenerate,
-        generating: isGenerating,
-        panelOpen: showEmojiPanel || showStickerPanel || showPlusMenu,
-        sessionId: session.id,
-        onTrigger: () => { void triggerAIResponse(); },
-    });
 
     useEffect(() => {
         const handleCustomAppReplyRequest = (event: Event) => {
@@ -5249,7 +5237,7 @@ export function ChatRoom({ session, onBack }: ChatRoomProps) {
                                 <div className="chat-offline-entry" data-role="assistant">
                                     {/* 头像占位：默认 display:none（见 chat.css），供自定义 CSS 显示 */}
                                     <div className="chat-offline-avatar" aria-hidden="true">
-                                        {character?.avatar ? <img src={character.avatar} alt="" /> : <ChatFallbackAvatar />}
+                                        {character?.chatAvatar || character?.avatar ? <img src={character?.chatAvatar || character?.avatar || ""} alt="" /> : <ChatFallbackAvatar />}
                                     </div>
                                     <div className="chat-offline-label-row">
                                         <div className="chat-offline-label">{session.isGroup ? (session.groupName || "群聊") : (character?.name || "对方")}</div>
@@ -5677,8 +5665,8 @@ export function ChatRoom({ session, onBack }: ChatRoomProps) {
                                                             : character;
                                                         if (targetChar) sendRichMessage("poke", { pokeTarget: targetChar.name });
                                                     }} className="w-[40px] h-[40px] rounded-[20px] bg-[var(--c-input)] overflow-hidden cursor-pointer">
-                                                        {senderChar?.avatar ? (
-                                                            <img src={senderChar.avatar} className="w-full h-full object-cover" alt="" />
+                                                        {senderChar?.chatAvatar || senderChar?.avatar ? (
+                                                            <img src={senderChar?.chatAvatar || senderChar?.avatar || ""} className="w-full h-full object-cover" alt="" />
                                                         ) : (
                                                             <ChatFallbackAvatar />
                                                         )}
@@ -5957,6 +5945,7 @@ export function ChatRoom({ session, onBack }: ChatRoomProps) {
                             showChatToast("已清空线下聊天记录");
                         }}
                         onDeleteFriend={() => onBack()}
+                        onCharacterChanged={(updated) => setCharacter(updated)}
                     />
                 </div>,
                 wrapperRef.current.parentElement
